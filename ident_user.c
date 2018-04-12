@@ -9,89 +9,45 @@
 #include <string.h>
 #include <unistd.h>
 
-static const unsigned char unisig[38] =
+static const char unisig[38] =
     "\xffUnisig\x00\x0a\x0d\x0a\x1aio.lassi.identikit.usermap";
 
-static unsigned char data[4096 * 4];
-static unsigned char *ptr;
-static unsigned char *limit;
+static char data[4096 * 4];
+static size_t datasize;
 
 static void die(const char *msg) {
   fprintf(stderr, "%s\n", msg);
   exit(1);
 }
 
-static void diemem(void) { die("out of memory"); }
+static char *get_ident_for_uid(const char *uid_envar) {
+  static char key[24];
+  const char *uid_str;
+  char *match;
+  size_t keysize;
 
-static void dietrunc(void) {
-  fprintf(stderr, "warning: truncated\n");
-  exit(1);
-}
-
-static uint64_t read_vint(void) {
-  uint64_t val, shift;
-
-  val = shift = 0;
-  do {
-    if (ptr >= limit) {
-      dietrunc();
-    }
-    val |= (127 & *ptr) << shift;
-    shift += 7;
-  } while (128 & *ptr++);
-  return val;
-}
-
-static void *read_bytes(size_t nbytes) {
-  void *ans;
-  if ((size_t)(limit - ptr) < nbytes) {
-    dietrunc();
+  if (!(uid_str = getenv(uid_envar))) {
+    return 0;
   }
-  ans = ptr;
-  ptr += nbytes;
-  return ans;
-}
-
-static uint64_t uint64env(const char *envar) {
-  const char *str;
-  unsigned long uintval;
-  int count, len;
-
-  str = getenv(envar);
-  if (!str) {
-    str = "";
+  if ((keysize = strlen(uid_str) + 4) > sizeof(key)) {
+    return 0;
   }
-  count = sscanf(str, "%lu%n", &uintval, &len);
-  if ((count != 1) || ((size_t)len != strlen(str))) {
-    fprintf(stderr, "cannot parse %s\n", envar);
-    exit(1);
-  }
-  return uintval;
-}
-
-static char *get_ident_for_uid(uint64_t goal_uid) {
-  if (memcmp(read_bytes(sizeof(unisig)), unisig, sizeof(unisig))) {
+  key[1] = 'U';
+  memcpy(key + 2, uid_str, strlen(uid_str));
+  key[keysize - 1] = 'I';
+  if ((datasize < sizeof(unisig)) || memcmp(data, unisig, sizeof(unisig))) {
     fprintf(stderr, "warning: corrupt\n");
-    exit(1);
+    return 0;
   }
-  while (ptr < limit) {
-    uid_t uid = read_vint();
-    size_t idlen = read_vint();
-    char *ident = read_bytes(idlen);
-    char *identmal;
-    if (uid == goal_uid) {
-      if (memchr(ident, 0, idlen)) {
-        fprintf(stderr, "warning: corrupt\n");
-        exit(1);
-      }
-      if (!(identmal = calloc(1, idlen + 1))) {
-        diemem();
-      }
-      memcpy(identmal, ident, idlen);
-      return identmal;
-    }
+  if (!(match = memmem(data + sizeof(unisig), datasize, key, keysize))) {
+    return 0;
   }
-  return 0;
+  match += keysize;
+  if (!memchr(match, 0, datasize - (match - data))) {
+    fprintf(stderr, "warning: corrupt\n");
+    return 0;
+  }
+  return match;
 }
 
 extern int main(int argc, char **argv) {
@@ -113,9 +69,8 @@ extern int main(int argc, char **argv) {
     fprintf(stderr, "warning: cannot read %s: %s\n", mapfile, strerror(errno));
     exit(1);
   }
-  ptr = limit = data;
-  limit += (size_t)nr;
-  ident = get_ident_for_uid(uint64env("IDENT_USER"));
+  datasize = nr;
+  ident = get_ident_for_uid("IDENT_USER");
   if (!ident) {
     setenv("IDENT_ERROR", "NO-USER", 1);
     ident = "";

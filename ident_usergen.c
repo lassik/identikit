@@ -17,9 +17,9 @@
 enum { MAXENTRIES = 512, MAXIDENTLEN = 31 };
 
 struct entry {
-  uid_t uid;
   char *actual_username; /* Not written to output file */
   char *ident;
+  char uidstr[24];
 };
 
 static struct entry entries[MAXENTRIES];
@@ -27,7 +27,7 @@ static size_t nentries;
 static char actual_usernames[4096]; /* \0 alice \0 bob \0 */
 static size_t actual_usernames_len = 1;
 
-static const unsigned char unisig[38] =
+static const char unisig[38] =
     "\xffUnisig\x00\x0a\x0d\x0a\x1aio.lassi.identikit.usermap";
 
 static void die(const char *msg) {
@@ -79,19 +79,6 @@ static void deal_with_impostors(void) {
   }
 }
 
-static int sort_by_uid(const void *a_void, const void *b_void) {
-  const struct entry *a = (const struct entry *)a_void;
-  const struct entry *b = (const struct entry *)b_void;
-
-  if (a->uid < b->uid) {
-    return -1;
-  }
-  if (a->uid > b->uid) {
-    return 1;
-  }
-  return 0;
-}
-
 static char *ident_from_dir(const char *dir) {
   static char buf[MAXIDENTLEN + 1];
   static struct stat st;
@@ -135,25 +122,12 @@ static char *ident_from_dir(const char *dir) {
 }
 
 static void add_entry_from_pw(struct entry *entry, struct passwd *pw) {
-  entry->uid = pw->pw_uid;
+  snprintf(entry->uidstr, sizeof(entry->uidstr), "%llu",
+           (unsigned long long)pw->pw_uid);
   entry->actual_username = strdup(pw->pw_name);
   if (!(entry->ident = ident_from_dir(pw->pw_dir))) {
     entry->ident = entry->actual_username;
   }
-}
-
-static void write_byte(int byte) {
-  if (fputc(byte, stdout) == EOF) {
-    diewrite();
-  }
-}
-
-static void write_vint(uint64_t x) {
-  while (x > 127) {
-    write_byte(128 | (127 & x));
-    x >>= 7;
-  }
-  write_byte(x);
 }
 
 static void write_bytes(const void *buf, size_t nbytes) {
@@ -166,10 +140,12 @@ static void write_entries_to_file(void) {
   struct entry *entry;
 
   write_bytes(unisig, sizeof(unisig));
+  write_bytes("", 1);
   for (entry = entries; entry < entries + nentries; entry++) {
-    write_vint(entry->uid);
-    write_vint(strlen(entry->ident));
-    write_bytes(entry->ident, strlen(entry->ident));
+      write_bytes("U", 1);
+      write_bytes(entry->uidstr, strlen(entry->uidstr) + 1);
+      write_bytes("I", 1);
+      write_bytes(entry->ident, strlen(entry->ident) + 1);
   }
 }
 
@@ -194,6 +170,5 @@ extern int main(void) {
     add_entry_from_pw(entries + nentries++, pw);
   }
   deal_with_impostors();
-  qsort(entries, nentries, sizeof(struct entry), sort_by_uid);
   write_entries_to_file();
 }
