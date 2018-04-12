@@ -1,0 +1,5 @@
+#define MIN_CLIENT_UID 500
+#define MAX_CLIENT_UID 65533
+#define NOBODY_UID 4294967294
+#define NOBODY_GID 4294967294
+#define NOBODY_DIR "/var/empty"
