@@ -4,7 +4,7 @@
 #include <string.h>
 #include <unistd.h>
 
-static const char progname[] = "ident-client";
+const char progname[] = "ident-client";
 
 static void usage(void) {
   fprintf(stderr, "usage: %s prog\n", progname);

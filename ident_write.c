@@ -1,8 +1,11 @@
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 
 #include "buf.h"
+
+const char progname[] = "ident-write";
 
 static char buffer[64];
 
@@ -11,14 +14,14 @@ extern int main(void) {
   char *user;
   char *syst;
   char *erro;
-  size_t localport;
-  size_t remoteport;
+  size_t serverport;
+  size_t clientport;
 
-  buf_init_str(getenv("IDENT_LOCALPORT"));
-  buf_need_dec(&localport);
+  buf_init_str(getenv("IDENT_SERVERPORT"));
+  buf_need_dec(&serverport);
 
-  buf_init_str(getenv("IDENT_REMOTEPORT"));
-  buf_need_dec(&remoteport);
+  buf_init_str(getenv("IDENT_CLIENTPORT"));
+  buf_need_dec(&clientport);
 
   str = getenv("IDENT_USER");
   if (!str)
@@ -36,9 +39,9 @@ extern int main(void) {
   erro = str;
 
   buf_init(buffer, sizeof(buffer));
-  buf_put_dec(localport);
+  buf_put_dec(serverport);
   buf_puts(",");
-  buf_put_dec(remoteport);
+  buf_put_dec(clientport);
   if (erro[0]) {
     buf_puts(":ERROR:");
     buf_puts(erro);
@@ -49,6 +52,7 @@ extern int main(void) {
     buf_puts(user);
   }
   buf_puts("\n");
+  fprintf(stderr, "writing response\n");
   buf_write_stdout();
   return 0;
 }
