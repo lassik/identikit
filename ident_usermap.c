@@ -22,6 +22,8 @@ struct entry {
   char uidstr[24];
 };
 
+const char progname[] = "ident-usermap";
+
 static struct entry entries[MAXENTRIES];
 static size_t nentries;
 static char actual_usernames[4096]; /* \0 alice \0 bob \0 */
@@ -142,10 +144,10 @@ static void write_entries_to_file(void) {
   write_bytes(unisig, sizeof(unisig));
   write_bytes("", 1);
   for (entry = entries; entry < entries + nentries; entry++) {
-      write_bytes("U", 1);
-      write_bytes(entry->uidstr, strlen(entry->uidstr) + 1);
-      write_bytes("I", 1);
-      write_bytes(entry->ident, strlen(entry->ident) + 1);
+    write_bytes("U", 1);
+    write_bytes(entry->uidstr, strlen(entry->uidstr) + 1);
+    write_bytes("I", 1);
+    write_bytes(entry->ident, strlen(entry->ident) + 1);
   }
 }
 
