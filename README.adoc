@@ -41,6 +41,10 @@ To always reply with the same fixed username:
 
     # IDENT_USER=partycat tcpserver 0 auth setuidgid nobody ident-read ident-write
 
+To reply with an error every time:
+
+    # IDENT_ERROR=NO-USER tcpserver 0 auth setuidgid nobody ident-read ident-write
+
 To reply with a random identstring every time:
 
     # tcpserver 0 auth setuidgid nobody ident-read \
