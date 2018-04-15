@@ -30,9 +30,9 @@ const char progname[] = "ident-portmap";
 extern void yield_uid(unsigned int sport, unsigned int cport, uid_t uid) {
   static char buf[24];
 
-  snprintf(buf, sizeof(buf), "P%u,%u", sport, cport);
+  snprintf(buf, sizeof(buf), "%u,%u", sport, cport);
   env_write('P', buf);
-  snprintf(buf, sizeof(buf), "U%u", uid);
+  snprintf(buf, sizeof(buf), "%u", uid);
   env_write('U', buf);
 }
 
@@ -62,7 +62,7 @@ static void get_ip_address(const char *funname, fun_t fun, uint32_t *out4,
   switch (addr.ss_family) {
   case AF_INET:
     *out4 = ((struct sockaddr_in *)&addr)->sin_addr.s_addr;
-    snprintf(outhex, 33, "%08X", *out4);
+    snprintf(outhex, 33, "%08X", ntohl(*out4));
     break;
   case AF_INET6:
     memcpy(out6, &((struct sockaddr_in6 *)&addr)->sin6_addr, 16);

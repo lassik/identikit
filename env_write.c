@@ -13,12 +13,11 @@ extern void env_write(int letter, const void *str) {
     return;
   }
   len = strlen(str);
-  if (sizeof(env_write_buf) - env_write_len < len + 3) {
+  if (sizeof(env_write_buf) - env_write_len <= len + 2) {
     die("out of space for environment variable");
   }
   env_write_buf[env_write_len++] = letter;
   memcpy(env_write_buf + env_write_len, str, len);
   env_write_len += len;
   env_write_buf[env_write_len++] = ':';
-  env_write_buf[env_write_len++] = 0;
 }

@@ -51,7 +51,7 @@ extern int main(void) {
     buf_puts(":");
     buf_puts(user);
   }
-  buf_puts("\n");
+  buf_puts("\r\n");
   buf_write_stdout();
   return 0;
 }
