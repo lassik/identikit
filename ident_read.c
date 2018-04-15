@@ -33,5 +33,5 @@ extern int main(int argc, char **argv) {
   setenv("IDENT_SERVERPORT", sportstr, 1);
   setenv("IDENT_CLIENTPORT", cportstr, 1);
   execvp(argv[1], &argv[1]);
-  buf_die_sys("exec");
+  diesys("exec");
 }

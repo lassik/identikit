@@ -52,7 +52,6 @@ extern int main(void) {
     buf_puts(user);
   }
   buf_puts("\n");
-  fprintf(stderr, "writing response\n");
   buf_write_stdout();
   return 0;
 }

@@ -13,19 +13,28 @@
 #include <unistd.h>
 
 #include "buf.h"
+#include "env_write.h"
 #include "util.h"
 
 #include "ident_portmap.h"
-
-typedef int (*fun_t)(int socket, struct sockaddr *restrict address,
-                     socklen_t *restrict address_len);
-
-const char progname[] = "ident-portmap";
 
 uint32_t saddr4;
 uint32_t caddr4;
 unsigned char saddr6[16];
 unsigned char caddr6[16];
+static char shex[33];
+static char chex[33];
+
+const char progname[] = "ident-portmap";
+
+extern void yield_uid(unsigned int sport, unsigned int cport, uid_t uid) {
+  static char buf[24];
+
+  snprintf(buf, sizeof(buf), "P%u,%u", sport, cport);
+  env_write('P', buf);
+  snprintf(buf, sizeof(buf), "U%u", uid);
+  env_write('U', buf);
+}
 
 static void ipv6_hex(const unsigned char addr[16], char out[33]) {
   const char hex[] = "0123456789ABCDEF";
@@ -38,8 +47,11 @@ static void ipv6_hex(const unsigned char addr[16], char out[33]) {
   out[32] = 0;
 }
 
+typedef int (*fun_t)(int socket, struct sockaddr *restrict address,
+                     socklen_t *restrict address_len);
+
 static void get_ip_address(const char *funname, fun_t fun, uint32_t *out4,
-                           unsigned char out6[16]) {
+                           unsigned char out6[16], char outhex[33]) {
   static struct sockaddr_storage addr;
   socklen_t socklen;
 
@@ -50,9 +62,11 @@ static void get_ip_address(const char *funname, fun_t fun, uint32_t *out4,
   switch (addr.ss_family) {
   case AF_INET:
     *out4 = ((struct sockaddr_in *)&addr)->sin_addr.s_addr;
+    snprintf(outhex, 33, "%08X", *out4);
     break;
   case AF_INET6:
     memcpy(out6, &((struct sockaddr_in6 *)&addr)->sin6_addr, 16);
+    ipv6_hex(out6, outhex);
     break;
   default:
     die("not an IP socket");
@@ -60,24 +74,18 @@ static void get_ip_address(const char *funname, fun_t fun, uint32_t *out4,
 }
 
 extern int main(int argc, char **argv) {
-  char shex[33];
-  char chex[33];
-
   if (argc < 2) {
     usage("prog");
   }
-  get_ip_address("getsockname", getsockname, &saddr4, saddr6);
-  get_ip_address("getpeername", getpeername, &caddr4, caddr6);
-  if (saddr4 && caddr4) {
-    fprintf(stderr, "4:%08X,%08X\n", saddr4, caddr4);
-  } else if (!saddr4 && !caddr4) {
-    ipv6_hex((unsigned char *)saddr6, shex);
-    ipv6_hex((unsigned char *)caddr6, chex);
-    fprintf(stderr, "6:%s,%s\n", shex, chex);
-  } else {
-    die("some mix of ipv4 and ipv6? wtf?");
+  get_ip_address("getsockname", getsockname, &saddr4, saddr6, shex);
+  get_ip_address("getpeername", getpeername, &caddr4, caddr6, chex);
+  if (!!saddr4 != !!caddr4) {
+    die("server and client are mixed IPv4 and IPv6, huh?");
   }
+  setenv("IDENT_SERVER", shex, 1);
+  setenv("IDENT_CLIENT", chex, 1);
   ident_portmap_grovel();
-  execvp(argv[1], argv + 1);
-  buf_die_sys("exec");
+  setenv("IDENT_PORTMAP", env_write_buf, 1);
+  execvp(argv[1], &argv[1]);
+  diesys("exec");
 }

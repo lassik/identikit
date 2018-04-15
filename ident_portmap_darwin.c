@@ -1,5 +1,3 @@
-// (inp->inp_flags & INP_ANONPORT)
-
 #include <sys/types.h>
 
 #include <sys/socketvar.h>
@@ -22,6 +20,7 @@ extern void ident_portmap_grovel(void) {
   static const char mibvar[] = "net.inet.tcp.pcblist";
   struct xinpgen *xigs;
   struct xinpgen *xig;
+  struct xtcpcb *xt;
   struct xsocket *so;
   struct inpcb *inp;
   size_t len;
@@ -41,18 +40,15 @@ extern void ident_portmap_grovel(void) {
     if (xig->xig_len <= sizeof(struct xinpgen)) {
       break;
     }
-    so = &((struct xtcpcb *)xig)->xt_socket;
-    inp = &((struct xtcpcb *)xig)->xt_inp;
+    xt = (struct xtcpcb *)xig;
+    so = &xt->xt_socket;
+    inp = &xt->xt_inp;
     if (so->xso_protocol != IPPROTO_TCP) {
       continue;
     }
     if (inp->inp_gencnt > xigs->xig_gen) {
       continue;
     }
-    if (inet_lnaof(inp->inp_laddr) == INADDR_ANY) {
-      continue;
-    }
-
     if ((inp->inp_vflag & INP_IPV4) && saddr4 && caddr4) {
       if (saddr4 != inp->inp_faddr.s_addr) {
         continue;
@@ -70,9 +66,7 @@ extern void ident_portmap_grovel(void) {
     } else {
       continue;
     }
-
-    fprintf(stderr, "P:%u,%u\nU:%u\n", ntohs(inp->inp_fport),
-            ntohs(inp->inp_lport), so->so_uid);
+    yield_uid(ntohs(inp->inp_fport), ntohs(inp->inp_lport), so->so_uid);
   }
   free(xigs);
 }

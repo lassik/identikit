@@ -13,6 +13,8 @@
 #include <unistd.h>
 
 #include "config.h"
+#include "env_write.h"
+#include "util.h"
 
 enum { MAXENTRIES = 512, MAXIDENTLEN = 31 };
 
@@ -29,22 +31,7 @@ static size_t nentries;
 static char actual_usernames[4096]; /* \0 alice \0 bob \0 */
 static size_t actual_usernames_len = 1;
 
-static const char unisig[38] =
-    "\xffUnisig\x00\x0a\x0d\x0a\x1aio.lassi.identikit.usermap";
-
-static void die(const char *msg) {
-  fprintf(stderr, "%s\n", msg);
-  exit(1);
-}
-
-static void diesys(const char *msg) {
-  fprintf(stderr, "%s\n", msg);
-  exit(1);
-}
-
 static void diemem(void) { die("out of memory"); }
-
-static void diewrite(void) { die("cannot write output file"); }
 
 static void add_to_actual_usernames(const char *username) {
   size_t size;
@@ -132,28 +119,21 @@ static void add_entry_from_pw(struct entry *entry, struct passwd *pw) {
   }
 }
 
-static void write_bytes(const void *buf, size_t nbytes) {
-  if (fwrite(buf, 1, nbytes, stdout) != nbytes) {
-    diewrite();
-  }
-}
-
-static void write_entries_to_file(void) {
+static void fill_envbuf(void) {
   struct entry *entry;
 
-  write_bytes(unisig, sizeof(unisig));
-  write_bytes("", 1);
   for (entry = entries; entry < entries + nentries; entry++) {
-    write_bytes("U", 1);
-    write_bytes(entry->uidstr, strlen(entry->uidstr) + 1);
-    write_bytes("I", 1);
-    write_bytes(entry->ident, strlen(entry->ident) + 1);
+    env_write('U', entry->uidstr);
+    env_write('I', entry->ident);
   }
 }
 
-extern int main(void) {
+extern int main(int argc, char **argv) {
   struct passwd *pw;
 
+  if (argc < 2) {
+    usage("prog");
+  }
   for (;;) {
     errno = 0;
     if (!(pw = getpwent())) {
@@ -172,5 +152,8 @@ extern int main(void) {
     add_entry_from_pw(entries + nentries++, pw);
   }
   deal_with_impostors();
-  write_entries_to_file();
+  fill_envbuf();
+  setenv("IDENT_USERMAP", env_write_buf, 1);
+  execvp(argv[1], &argv[1]);
+  diesys("exec");
 }
