@@ -1,0 +1,51 @@
+# identikit
+
+An identd (_ident_ aka _auth_ protocol server) coded on a lark (or as
+I believe the cool kids would say nowadays, _I did it for the lulz_).
+I realized that an identd could be written entirely using Bernstein
+chaining and couldn't resist. Going even further, all state is passed
+via environment variables!
+
+identikit comes as a self-assembly kit of tiny programs:
+
+* ident-usermap -- Peruse `/etc/passwd` and user home directories
+  (they can contain `~/.noident` and `~/.fakeid` files). Set
+  IDENT_USERMAP to a userid->identstring mapping based on the results.
+
+* ident-portmap -- Peruse the operating system's list of active TCP
+  connections. Look for connections to the host that the socket on
+  stdin is coming from. Set IDENT_PORTMAP to a map of port,port,userid
+  tuples on that host.
+
+* ident-read -- Read an ident protocol query from stdin. Set
+  IDENT_SERVERPORT, IDENT_CLIENTPORT to the port numbers in the query.
+
+* ident-unmap -- Find IDENT_USER (userid) by looking up
+  IDENT_SERVERPORT, IDENT_CLIENTPORT in IDENT_PORTMAP (if set). Then
+  convert IDENT_USER from userid to identstring by looking it up in
+  IDENT_USERMAP (if set). Set IDENT_ERROR if user not found or
+  identstring is blank.
+
+* ident-write -- Write ident protocol response to stdout based on
+  IDENT_SERVERPORT, IDENT_CLIENTPORT, IDENT_USER, IDENT_ERROR.
+
+Combine them freely (in that order) to build your very own ident server :-)
+
+To have a "normal" identd:
+
+    # ident-usermap tcpserver 0 auth setuidgid nobody ident-portmap ident-read ident-unmap ident-write
+
+To reply with a numeric userid instead of textual username, omit `ident-usermap`.
+
+To always reply with the same fixed username:
+
+    # IDENT_USER=partycat tcpserver 0 auth setuidgid nobody ident-read ident-write
+
+To reply with a random identstring every time:
+
+    # tcpserver 0 auth setuidgid nobody ident-read \
+        sh -c 'IDENT_USER=$(head -c 16 /dev/random | base64) ident-write'
+
+You can also customize the operating system in the reply (default `UNIX`):
+
+    # IDENT_OPSYS=$(uname)
